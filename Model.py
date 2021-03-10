@@ -68,15 +68,17 @@ class Seq2SeqBasic(torch.nn.Module):
         self.LossFunction = torch.nn.CrossEntropyLoss()
 
     def forward(self, article, abstract=None, abstract_label_raw=None):
-        encoder_output, lstm_state = self.BLSTM_Encoder_Layer(article)
-        encoder_output = encoder_output.squeeze()
-        assert len(encoder_output.size()) == 2
-
         abstract_label = []
         for sample in abstract_label_raw:
             abstract_label.append(self.dictionary2index[sample.numpy()[0]])
         abstract_label = torch.LongTensor(abstract_label)
-        if self.CudaFlag: abstract_label = abstract_label.cuda()
+        if self.CudaFlag:
+            article = article.cuda()
+            abstract_label = abstract_label.cuda()
+
+        encoder_output, lstm_state = self.BLSTM_Encoder_Layer(article)
+        encoder_output = encoder_output.squeeze()
+        assert len(encoder_output.size()) == 2
 
         # 2 1 512
         # 1 1 512
@@ -86,6 +88,7 @@ class Seq2SeqBasic(torch.nn.Module):
                          torch.cat([lstm_state[1][0], lstm_state[1][1]], dim=-1).unsqueeze(0)]
 
         if abstract is not None:
+            if self.CudaFlag: abstract = abstract.cuda()
             abstract = abstract.squeeze()
             decoder_predict_probability = []
 
@@ -125,12 +128,21 @@ class Seq2SeqBasicBatch(Seq2SeqBasic):
     def __init__(self, dictionary_embedding, cuda_flag=True):
         super(Seq2SeqBasicBatch, self).__init__(dictionary_embedding=dictionary_embedding, cuda_flag=cuda_flag)
 
-    def forward(self, article, abstract=None, abstract_label_raw=None):
-        print(numpy.shape(article))
+    def __article__padding_(self, article):
+        article_padding = []
+        article_max_length = numpy.max([len(sample) for sample in article])
         for sample in article:
-            print(numpy.shape(sample))
-        # encoder_output, lstm_state = self.BLSTM_Encoder_Layer(article)
-        # print(numpy.shape(encoder_output))
+            article_sample = torch.cat([sample, torch.zeros([article_max_length - sample.size()[0], sample.size()[1]])],
+                                       dim=0).unsqueeze(0)
+            article_padding.append(article_sample)
+        article_padding = torch.cat(article_padding, dim=0)
+        return article_padding
+
+    def forward(self, article, abstract=None, abstract_label_raw=None):
+        article_padding = self.__article__padding_(article=article)
+        if self.CudaFlag: article_padding = article_padding.cuda()
+        encoder_output, lstm_state = self.BLSTM_Encoder_Layer(article_padding)
+        print(numpy.shape(encoder_output))
 
 
 if __name__ == '__main__':
@@ -151,9 +163,6 @@ if __name__ == '__main__':
         total_loss = 0.0
         with open(os.path.join(save_path, 'Loss-%04d.csv' % episode_index), 'w') as file:
             for batchIndex, [batchArticle, batchAbstract, batchAbstractLabel] in enumerate(train_dataset):
-                if cuda_flag:
-                    batchArticle = batchArticle.cuda()
-                    batchAbstract = batchAbstract.cuda()
                 loss = seq2seqBasic(batchArticle, batchAbstract, batchAbstractLabel)
                 exit()
                 loss_value = loss.cpu().detach().numpy()

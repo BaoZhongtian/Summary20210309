@@ -9,6 +9,14 @@ import pytorch_pretrained_bert
 import Model
 
 
+class CollateSummarization:
+    def __call__(self, batch):
+        xs = [v[0] for v in batch]
+        ys = [v[1] for v in batch]
+        zs = [v[2] for v in batch]
+        return xs, ys, zs
+
+
 class SummarizationDataset(torch_utils_data.Dataset):
     def __init__(self, article, abstract, dictionary):
         self.article, self.abstract, self.dictionary = article, abstract, dictionary
@@ -99,12 +107,13 @@ def loader_summarization_initial():
 
 
 def loader_summarization(batch_size=32, cuda_flag=True):
-    if not os.path.exists('Data/Dictionary.pkl'): loader_summarization_initial()
-    dictionary = pickle.load(open('Data/Dictionary.pkl', 'rb'))
+    load_path = 'C:/ProjectData/'
+    if not os.path.exists(load_path + 'Data/Dictionary.pkl'): loader_summarization_initial()
+    dictionary = pickle.load(open(load_path + 'Data/Dictionary.pkl', 'rb'))
 
     dictionary.add(101)
     dictionary.add(102)
-    if not os.path.exists('Data/Dictionary_Embedding.pkl'):
+    if not os.path.exists(load_path + 'Data/Dictionary_Embedding.pkl'):
         print('Generate Embedding')
         dictionary_list, dictionary_embedding = [], {}
         for sample in dictionary: dictionary_list.append(sample)
@@ -122,16 +131,16 @@ def loader_summarization(batch_size=32, cuda_flag=True):
 
             for index in range(len(batch_data_raw)):
                 dictionary_embedding[batch_data_raw[index]] = numpy.array(word_embedding[index])
-        pickle.dump(dictionary_embedding, open('Data/Dictionary_Embedding.pkl', 'wb'))
-    dictionary_embedding = pickle.load(open('Data/Dictionary_Embedding.pkl', 'rb'))
+        pickle.dump(dictionary_embedding, open(load_path + 'Data/Dictionary_Embedding.pkl', 'wb'))
+    dictionary_embedding = pickle.load(open(load_path + 'Data/Dictionary_Embedding.pkl', 'rb'))
 
     print('Reading pickle data...')
-    train_article = pickle.load(open('Data/train_article.pkl', 'rb'))[0:100]
-    train_abstract = pickle.load(open('Data/train_abstract.pkl', 'rb'))[0:100]
-    val_article = pickle.load(open('Data/val_article.pkl', 'rb'))[0:100]
-    val_abstract = pickle.load(open('Data/val_abstract.pkl', 'rb'))[0:100]
-    test_article = pickle.load(open('Data/test_article.pkl', 'rb'))[0:100]
-    test_abstract = pickle.load(open('Data/test_abstract.pkl', 'rb'))[0:100]
+    train_article = pickle.load(open(load_path + 'Data/train_article.pkl', 'rb'))[0:100]
+    train_abstract = pickle.load(open(load_path + 'Data/train_abstract.pkl', 'rb'))[0:100]
+    val_article = pickle.load(open(load_path + 'Data/val_article.pkl', 'rb'))[0:100]
+    val_abstract = pickle.load(open(load_path + 'Data/val_abstract.pkl', 'rb'))[0:100]
+    test_article = pickle.load(open(load_path + 'Data/test_article.pkl', 'rb'))[0:100]
+    test_abstract = pickle.load(open(load_path + 'Data/test_abstract.pkl', 'rb'))[0:100]
 
     train_dataset = SummarizationDataset(article=train_article, abstract=train_abstract,
                                          dictionary=dictionary_embedding)
@@ -140,9 +149,12 @@ def loader_summarization(batch_size=32, cuda_flag=True):
     test_dataset = SummarizationDataset(article=test_article, abstract=test_abstract,
                                         dictionary=dictionary_embedding)
 
-    train_loader = torch_utils_data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=False)
-    val_loader = torch_utils_data.DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False)
-    test_loader = torch_utils_data.DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
+    train_loader = torch_utils_data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True,
+                                               collate_fn=CollateSummarization())
+    val_loader = torch_utils_data.DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=True,
+                                             collate_fn=CollateSummarization())
+    test_loader = torch_utils_data.DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False,
+                                              collate_fn=CollateSummarization())
     return train_loader, val_loader, test_loader, dictionary_embedding
 
 
