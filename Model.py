@@ -128,21 +128,65 @@ class Seq2SeqBasicBatch(Seq2SeqBasic):
     def __init__(self, dictionary_embedding, cuda_flag=True):
         super(Seq2SeqBasicBatch, self).__init__(dictionary_embedding=dictionary_embedding, cuda_flag=cuda_flag)
 
-    def __article__padding_(self, article):
+    def input_padding(self, article):
         article_padding = []
+        article_length = torch.LongTensor([len(sample) for sample in article])
         article_max_length = numpy.max([len(sample) for sample in article])
         for sample in article:
             article_sample = torch.cat([sample, torch.zeros([article_max_length - sample.size()[0], sample.size()[1]])],
                                        dim=0).unsqueeze(0)
             article_padding.append(article_sample)
         article_padding = torch.cat(article_padding, dim=0)
-        return article_padding
+        return article_padding, article_length
+
+    def attention_mask(self, length):
+        max_length = torch.max(length).numpy()
+        attention_map = []
+        for length_sample in length:
+            sample_attention_map = torch.cat(
+                [torch.ones(length_sample), -1 * torch.ones(max_length - length_sample.numpy())])
+            attention_map.append(sample_attention_map.unsqueeze(0))
+        attention_map = torch.cat(attention_map, dim=0).unsqueeze(-1) * 9999
+        if self.CudaFlag: attention_map = attention_map.cuda()
+        return attention_map
 
     def forward(self, article, abstract=None, abstract_label_raw=None):
-        article_padding = self.__article__padding_(article=article)
+        article_padding, article_length = self.input_padding(article=article)
+        article_attention_map = self.attention_mask(length=article_length)
+
         if self.CudaFlag: article_padding = article_padding.cuda()
         encoder_output, lstm_state = self.BLSTM_Encoder_Layer(article_padding)
-        print(numpy.shape(encoder_output))
+
+        decoder_input = self.SOS_Embedding.repeat([encoder_output.size()[0], 1, 1])
+        decoder_state = [torch.cat([lstm_state[0][0], lstm_state[0][1]], dim=-1).unsqueeze(0),
+                         torch.cat([lstm_state[1][0], lstm_state[1][1]], dim=-1).unsqueeze(0)]
+
+        ##############################################
+
+        abstract_padding, abstract_length = self.input_padding(article=abstract)
+        decoder_predict_probability = []
+        for _ in range(abstract_padding.size()[1]):
+            decoder_output, decoder_state = self.LSTM_Decoder_Layer(decoder_input, hx=decoder_state)
+            decoder_repeat = decoder_output.repeat([1, encoder_output.size()[1], 1])
+            decoder_output_concat = torch.cat([decoder_repeat, encoder_output], dim=-1)
+            decoder_attention_weight = torch.min(self.AttentionWeight_Layer(decoder_output_concat),
+                                                 article_attention_map).softmax(dim=1)
+            decoder_attention_padding = decoder_attention_weight.repeat([1, 1, 2048])
+            decoder_weighted_raw = decoder_output_concat * decoder_attention_padding
+            decoder_weighted = decoder_weighted_raw.sum(dim=1)
+
+            decoder_predict = self.Predict_Decoder_Layer(decoder_weighted)
+            decoder_predict_probability.append(decoder_predict)
+            # print(numpy.shape(decoder_predict))
+            decoder_predict_value = decoder_predict.argmax(dim=-1)
+
+            decoder_input = [torch.FloatTensor(
+                self.Dictionary[self.index2dictionary[decoder_predict_value.detach().cpu().numpy()[index]]]).unsqueeze(
+                0) for index in range(encoder_output.size()[0])]
+            decoder_input = torch.cat(decoder_input, dim=0)
+            print(numpy.shape(decoder_input))
+            print(numpy.shape(decoder_weighted))
+            exit()
 
 
 if __name__ == '__main__':
@@ -161,19 +205,19 @@ if __name__ == '__main__':
 
     for episode_index in range(100):
         total_loss = 0.0
-        with open(os.path.join(save_path, 'Loss-%04d.csv' % episode_index), 'w') as file:
-            for batchIndex, [batchArticle, batchAbstract, batchAbstractLabel] in enumerate(train_dataset):
-                loss = seq2seqBasic(batchArticle, batchAbstract, batchAbstractLabel)
-                exit()
-                loss_value = loss.cpu().detach().numpy()
-                total_loss += loss_value
-                print('\rBatch %d Loss = %f' % (batchIndex, loss_value), end='')
-                file.write(str(loss_value) + '\n')
+    with open(os.path.join(save_path, 'Loss-%04d.csv' % episode_index), 'w') as file:
+        for batchIndex, [batchArticle, batchAbstract, batchAbstractLabel] in enumerate(train_dataset):
+            loss = seq2seqBasic(batchArticle, batchAbstract, batchAbstractLabel)
+            exit()
+            loss_value = loss.cpu().detach().numpy()
+            total_loss += loss_value
+            print('\rBatch %d Loss = %f' % (batchIndex, loss_value), end='')
+            file.write(str(loss_value) + '\n')
 
-                loss.backward()
-                optimizer.step()
-                optimizer.zero_grad()
-        # print('\nEpisode %d Total Loss = %f' % (episode_index, total_loss))
-        # torch.save(obj={'ModelStateDict': seq2seqBasic.state_dict(), 'OptimizerStateDict': optimizer.state_dict()},
-        #            f=os.path.join(save_path, 'Parameter-%04d.pkl' % episode_index))
-        # torch.save(obj=seq2seqBasic, f=os.path.join(save_path, 'Network-%04d.pkl' % episode_index))
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
+            # print('\nEpisode %d Total Loss = %f' % (episode_index, total_loss))
+            # torch.save(obj={'ModelStateDict': seq2seqBasic.state_dict(), 'OptimizerStateDict': optimizer.state_dict()},
+            #            f=os.path.join(save_path, 'Parameter-%04d.pkl' % episode_index))
+            # torch.save(obj=seq2seqBasic, f=os.path.join(save_path, 'Network-%04d.pkl' % episode_index))
