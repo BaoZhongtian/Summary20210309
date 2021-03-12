@@ -38,6 +38,10 @@ class BertModelRawForEmbedding(pytorch_pretrained_bert.modeling.BertPreTrainedMo
         embedding_output = self.embeddings(input_ids, token_type_ids)
         return embedding_output
 
+#############################
+
+#############################
+
 
 #############################
 # For Seq2Seq Part
@@ -124,69 +128,79 @@ class Seq2SeqBasic(torch.nn.Module):
             return loss
 
 
-class Seq2SeqBasicBatch(Seq2SeqBasic):
-    def __init__(self, dictionary_embedding, cuda_flag=True):
-        super(Seq2SeqBasicBatch, self).__init__(dictionary_embedding=dictionary_embedding, cuda_flag=cuda_flag)
-
-    def input_padding(self, article):
-        article_padding = []
-        article_length = torch.LongTensor([len(sample) for sample in article])
-        article_max_length = numpy.max([len(sample) for sample in article])
-        for sample in article:
-            article_sample = torch.cat([sample, torch.zeros([article_max_length - sample.size()[0], sample.size()[1]])],
-                                       dim=0).unsqueeze(0)
-            article_padding.append(article_sample)
-        article_padding = torch.cat(article_padding, dim=0)
-        return article_padding, article_length
-
-    def attention_mask(self, length):
-        max_length = torch.max(length).numpy()
-        attention_map = []
-        for length_sample in length:
-            sample_attention_map = torch.cat(
-                [torch.ones(length_sample), -1 * torch.ones(max_length - length_sample.numpy())])
-            attention_map.append(sample_attention_map.unsqueeze(0))
-        attention_map = torch.cat(attention_map, dim=0).unsqueeze(-1) * 9999
-        if self.CudaFlag: attention_map = attention_map.cuda()
-        return attention_map
-
-    def forward(self, article, abstract=None, abstract_label_raw=None):
-        article_padding, article_length = self.input_padding(article=article)
-        article_attention_map = self.attention_mask(length=article_length)
-
-        if self.CudaFlag: article_padding = article_padding.cuda()
-        encoder_output, lstm_state = self.BLSTM_Encoder_Layer(article_padding)
-
-        decoder_input = self.SOS_Embedding.repeat([encoder_output.size()[0], 1, 1])
-        decoder_state = [torch.cat([lstm_state[0][0], lstm_state[0][1]], dim=-1).unsqueeze(0),
-                         torch.cat([lstm_state[1][0], lstm_state[1][1]], dim=-1).unsqueeze(0)]
-
-        ##############################################
-
-        abstract_padding, abstract_length = self.input_padding(article=abstract)
-        decoder_predict_probability = []
-        for _ in range(abstract_padding.size()[1]):
-            decoder_output, decoder_state = self.LSTM_Decoder_Layer(decoder_input, hx=decoder_state)
-            decoder_repeat = decoder_output.repeat([1, encoder_output.size()[1], 1])
-            decoder_output_concat = torch.cat([decoder_repeat, encoder_output], dim=-1)
-            decoder_attention_weight = torch.min(self.AttentionWeight_Layer(decoder_output_concat),
-                                                 article_attention_map).softmax(dim=1)
-            decoder_attention_padding = decoder_attention_weight.repeat([1, 1, 2048])
-            decoder_weighted_raw = decoder_output_concat * decoder_attention_padding
-            decoder_weighted = decoder_weighted_raw.sum(dim=1)
-
-            decoder_predict = self.Predict_Decoder_Layer(decoder_weighted)
-            decoder_predict_probability.append(decoder_predict)
-            # print(numpy.shape(decoder_predict))
-            decoder_predict_value = decoder_predict.argmax(dim=-1)
-
-            decoder_input = [torch.FloatTensor(
-                self.Dictionary[self.index2dictionary[decoder_predict_value.detach().cpu().numpy()[index]]]).unsqueeze(
-                0) for index in range(encoder_output.size()[0])]
-            decoder_input = torch.cat(decoder_input, dim=0)
-            print(numpy.shape(decoder_input))
-            print(numpy.shape(decoder_weighted))
-            exit()
+# class Seq2SeqBasicBatch(Seq2SeqBasic):
+#     def __init__(self, dictionary_embedding, cuda_flag=True):
+#         super(Seq2SeqBasicBatch, self).__init__(dictionary_embedding=dictionary_embedding, cuda_flag=cuda_flag)
+#
+#     def input_padding(self, article):
+#         article_padding = []
+#         article_length = torch.LongTensor([len(sample) for sample in article])
+#         article_max_length = numpy.max([len(sample) for sample in article])
+#         for sample in article:
+#             article_sample = torch.cat([sample, torch.zeros([article_max_length - sample.size()[0], sample.size()[1]])],
+#                                        dim=0).unsqueeze(0)
+#             article_padding.append(article_sample)
+#         article_padding = torch.cat(article_padding, dim=0)
+#         return article_padding, article_length
+#
+#     def attention_mask(self, length):
+#         max_length = torch.max(length).numpy()
+#         attention_map = []
+#         for length_sample in length:
+#             sample_attention_map = torch.cat(
+#                 [torch.ones(length_sample), -1 * torch.ones(max_length - length_sample.numpy())])
+#             attention_map.append(sample_attention_map.unsqueeze(0))
+#         attention_map = torch.cat(attention_map, dim=0).unsqueeze(-1) * 9999
+#         if self.CudaFlag: attention_map = attention_map.cuda()
+#         return attention_map
+#
+#     def forward(self, article, abstract=None, abstract_label_raw=None):
+#         article_padding, article_length = self.input_padding(article=article)
+#         article_attention_map = self.attention_mask(length=article_length)
+#
+#         if self.CudaFlag: article_padding = article_padding.cuda()
+#         encoder_output, lstm_state = self.BLSTM_Encoder_Layer(article_padding)
+#
+#         decoder_input = self.SOS_Embedding.repeat([encoder_output.size()[0], 1, 1])
+#         decoder_state = [torch.cat([lstm_state[0][0], lstm_state[0][1]], dim=-1).unsqueeze(0),
+#                          torch.cat([lstm_state[1][0], lstm_state[1][1]], dim=-1).unsqueeze(0)]
+#
+#         ##############################################
+#
+#         abstract_padding, abstract_length = self.input_padding(article=abstract)
+#         decoder_predict_probability = []
+#         print(numpy.shape(abstract_padding))
+#
+#         for _ in range(abstract_padding.size()[1]):
+#             decoder_output, decoder_state = self.LSTM_Decoder_Layer(decoder_input, hx=decoder_state)
+#             decoder_repeat = decoder_output.repeat([1, encoder_output.size()[1], 1])
+#             decoder_output_concat = torch.cat([decoder_repeat, encoder_output], dim=-1)
+#             decoder_attention_weight = torch.min(self.AttentionWeight_Layer(decoder_output_concat),
+#                                                  article_attention_map).softmax(dim=1)
+#             decoder_attention_padding = decoder_attention_weight.repeat([1, 1, 2048])
+#             decoder_weighted_raw = decoder_output_concat * decoder_attention_padding
+#             decoder_weighted = decoder_weighted_raw.sum(dim=1)
+#
+#             decoder_predict = self.Predict_Decoder_Layer(decoder_weighted)
+#             decoder_predict_probability.append(decoder_predict)
+#             # print(numpy.shape(decoder_predict))
+#             decoder_predict_value = decoder_predict.argmax(dim=-1)
+#
+#             decoder_input = [torch.FloatTensor(
+#                 self.Dictionary[self.index2dictionary[decoder_predict_value.detach().cpu().numpy()[index]]]).unsqueeze(
+#                 0) for index in range(encoder_output.size()[0])]
+#             decoder_input = torch.cat(decoder_input, dim=0)
+#
+#             decoder_weighted_choose = decoder_weighted.view([decoder_weighted.size()[0], 2, 1024]).permute([1, 0, 2])[1]
+#             if self.CudaFlag:
+#                 decoder_input = decoder_input.cuda()
+#                 decoder_weighted_choose = decoder_weighted_choose.cuda()
+#             decoder_input = torch.cat([decoder_input, decoder_weighted_choose], dim=-1).unsqueeze(1)
+#
+#         print(decoder_predict_probability[0].size())
+#
+#         # decoder_predict_probability = torch.cat(decoder_predict_probability, dim=0)
+#         # print(numpy.shape(decoder_predict_probability))
 
 
 if __name__ == '__main__':
@@ -197,7 +211,7 @@ if __name__ == '__main__':
 
     save_path = 'Result/BasicBatch'
     if not os.path.exists(save_path): os.makedirs(save_path)
-    train_dataset, val_dataset, test_dataset, dictionary_embedding = loader_summarization(batch_size=32)
+    train_dataset, val_dataset, test_dataset, dictionary_embedding = loader_summarization(batch_size=4)
 
     seq2seqBasic = Seq2SeqBasicBatch(dictionary_embedding, cuda_flag=cuda_flag)
     if cuda_flag: seq2seqBasic.cuda()
