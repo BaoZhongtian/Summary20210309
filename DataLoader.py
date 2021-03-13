@@ -17,6 +17,34 @@ class CollateSummarization:
         return xs, ys, zs
 
 
+class CollateWordBag:
+    def __init__(self, dictionary, paragraph_number):
+        self.paragraph_number = paragraph_number
+        self.index2dictionary, self.dictionary2index = {}, {}
+        counter = 0
+        for sample in dictionary:
+            self.index2dictionary[counter] = sample
+            self.dictionary2index[sample] = counter
+            counter += 1
+
+    def __call__(self, batch):
+        xs = batch
+
+        xs_return = []
+        for indexX in range(len(xs)):
+            part_length = numpy.int(numpy.ceil(len(xs[indexX]) / self.paragraph_number))
+            sample = []
+            for part_index in range(self.paragraph_number):
+                word_bag_sample = numpy.zeros(len(self.index2dictionary.keys()))
+                part_sample = xs[indexX][part_index * part_length:(part_index + 1) * part_length]
+                for indexY in range(len(part_sample)):
+                    word_bag_sample[self.dictionary2index[part_sample[indexY]]] += 1
+                sample.append(word_bag_sample)
+            xs_return.append(sample)
+
+        return torch.FloatTensor(xs_return)
+
+
 class SummarizationDataset(torch_utils_data.Dataset):
     def __init__(self, article, abstract, dictionary):
         self.article, self.abstract, self.dictionary = article, abstract, dictionary
@@ -33,6 +61,17 @@ class SummarizationDataset(torch_utils_data.Dataset):
 
         return torch.FloatTensor(numpy.array(article_tokens)), torch.FloatTensor(
             numpy.array(abstract_tokens)), self.abstract[index]
+
+
+class SummarizationWordBagDataset(torch_utils_data.Dataset):
+    def __init__(self, article, abstract):
+        self.article = article
+
+    def __len__(self):
+        return len(self.article)
+
+    def __getitem__(self, index):
+        return self.article[index]
 
 
 def loader_summarization_initial():
@@ -106,7 +145,7 @@ def loader_summarization_initial():
     print('Initial Treat Completed')
 
 
-def loader_summarization(batch_size=32, cuda_flag=True):
+def loader_summarization(batch_size=32, cuda_flag=True, word_bag_flag=False, paragraph_number=None):
     load_path = 'C:/ProjectData/'
     if not os.path.exists(load_path + 'Data/Dictionary.pkl'): loader_summarization_initial()
     dictionary = pickle.load(open(load_path + 'Data/Dictionary.pkl', 'rb'))
@@ -135,32 +174,47 @@ def loader_summarization(batch_size=32, cuda_flag=True):
     dictionary_embedding = pickle.load(open(load_path + 'Data/Dictionary_Embedding.pkl', 'rb'))
 
     print('Reading pickle data...')
-    train_article = pickle.load(open(load_path + 'Data/train_article.pkl', 'rb'))[0:100]
-    train_abstract = pickle.load(open(load_path + 'Data/train_abstract.pkl', 'rb'))[0:100]
-    val_article = pickle.load(open(load_path + 'Data/val_article.pkl', 'rb'))[0:100]
-    val_abstract = pickle.load(open(load_path + 'Data/val_abstract.pkl', 'rb'))[0:100]
-    test_article = pickle.load(open(load_path + 'Data/test_article.pkl', 'rb'))[0:100]
-    test_abstract = pickle.load(open(load_path + 'Data/test_abstract.pkl', 'rb'))[0:100]
+    train_article = pickle.load(open(load_path + 'Data/train_article.pkl', 'rb'))
+    train_abstract = pickle.load(open(load_path + 'Data/train_abstract.pkl', 'rb'))
+    val_article = pickle.load(open(load_path + 'Data/val_article.pkl', 'rb'))
+    val_abstract = pickle.load(open(load_path + 'Data/val_abstract.pkl', 'rb'))
+    test_article = pickle.load(open(load_path + 'Data/test_article.pkl', 'rb'))
+    test_abstract = pickle.load(open(load_path + 'Data/test_abstract.pkl', 'rb'))
 
-    train_dataset = SummarizationDataset(article=train_article, abstract=train_abstract,
-                                         dictionary=dictionary_embedding)
-    val_dataset = SummarizationDataset(article=val_article, abstract=val_abstract,
-                                       dictionary=dictionary_embedding)
-    test_dataset = SummarizationDataset(article=test_article, abstract=test_abstract,
-                                        dictionary=dictionary_embedding)
+    if not word_bag_flag:
+        train_dataset = SummarizationDataset(article=train_article, abstract=train_abstract,
+                                             dictionary=dictionary_embedding)
+        val_dataset = SummarizationDataset(article=val_article, abstract=val_abstract,
+                                           dictionary=dictionary_embedding)
+        test_dataset = SummarizationDataset(article=test_article, abstract=test_abstract,
+                                            dictionary=dictionary_embedding)
+        train_loader = torch_utils_data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True,
+                                                   collate_fn=CollateSummarization())
+        val_loader = torch_utils_data.DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=True,
+                                                 collate_fn=CollateSummarization())
+        test_loader = torch_utils_data.DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False,
+                                                  collate_fn=CollateSummarization())
+    else:
+        train_dataset = SummarizationWordBagDataset(article=train_article, abstract=train_abstract)
+        val_dataset = SummarizationWordBagDataset(article=val_article, abstract=val_abstract)
+        test_dataset = SummarizationWordBagDataset(article=test_article, abstract=test_abstract)
+        train_loader = torch_utils_data.DataLoader(
+            dataset=train_dataset, batch_size=batch_size, shuffle=True,
+            collate_fn=CollateWordBag(dictionary=dictionary, paragraph_number=paragraph_number))
+        val_loader = torch_utils_data.DataLoader(
+            dataset=val_dataset, batch_size=batch_size, shuffle=True,
+            collate_fn=CollateWordBag(dictionary=dictionary, paragraph_number=paragraph_number))
+        test_loader = torch_utils_data.DataLoader(
+            dataset=test_dataset, batch_size=batch_size, shuffle=True,
+            collate_fn=CollateWordBag(dictionary=dictionary, paragraph_number=paragraph_number))
 
-    train_loader = torch_utils_data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True,
-                                               collate_fn=CollateSummarization())
-    val_loader = torch_utils_data.DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=True,
-                                             collate_fn=CollateSummarization())
-    test_loader = torch_utils_data.DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False,
-                                              collate_fn=CollateSummarization())
     return train_loader, val_loader, test_loader, dictionary_embedding
 
 
 if __name__ == '__main__':
     # print(str(b"abc", "utf - 8"))
-    loader_summarization()
-#     for batchIndex, [batchArticle, batchAbstract] in enumerate(test_loader):
-#         print(batchIndex, numpy.shape(batchArticle), numpy.shape(batchAbstract))
-#         exit()
+    train_loader, val_loader, test_loader, dictionary_embedding = loader_summarization(
+        word_bag_flag=True, batch_size=64, paragraph_number=5)
+    for batchIndex, batchArticle in enumerate(test_loader):
+        print(batchIndex, numpy.shape(batchArticle))
+        # exit()

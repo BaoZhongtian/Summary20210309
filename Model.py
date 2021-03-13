@@ -38,9 +38,53 @@ class BertModelRawForEmbedding(pytorch_pretrained_bert.modeling.BertPreTrainedMo
         embedding_output = self.embeddings(input_ids, token_type_ids)
         return embedding_output
 
-#############################
 
 #############################
+# For Variational Auto Encoder Part
+#############################
+class VariationalAutoEncoder(torch.nn.Module):
+    def __init__(self, topic_number=50, cuda_flag=True):
+        super(VariationalAutoEncoder, self).__init__()
+        self.cuda_flag = cuda_flag
+        self.encoder_mean = torch.nn.Sequential(
+            torch.nn.Linear(in_features=27550, out_features=5000),
+            torch.nn.ReLU(),
+            torch.nn.Linear(in_features=5000, out_features=1000),
+            torch.nn.ReLU(),
+            torch.nn.Linear(in_features=1000, out_features=topic_number),
+            torch.nn.ReLU(),
+        )
+        self.encoder_std = torch.nn.Sequential(
+            torch.nn.Linear(in_features=27550, out_features=5000),
+            torch.nn.ReLU(),
+            torch.nn.Linear(in_features=5000, out_features=1000),
+            torch.nn.ReLU(),
+            torch.nn.Linear(in_features=1000, out_features=topic_number),
+            torch.nn.ReLU(),
+        )
+        self.decoder = torch.nn.Sequential(
+            torch.nn.Linear(in_features=topic_number, out_features=1000),
+            torch.nn.ReLU(),
+            torch.nn.Linear(in_features=1000, out_features=5000),
+            torch.nn.ReLU(),
+            torch.nn.Linear(in_features=5000, out_features=27550),
+            torch.nn.ReLU(),
+        )
+        self.loss_function = torch.nn.MSELoss()
+
+    def forward(self, batch_data):
+        if self.cuda_flag: batch_data = batch_data.cuda()
+        batch_data_mean = self.encoder_mean(batch_data)
+        batch_data_std = self.encoder_std(batch_data)
+
+        batch_hidden = batch_data_mean + torch.exp(batch_data_std) * torch.randn_like(batch_data_std)
+        batch_decode = self.decoder(batch_hidden)
+
+        kld = 0.5 * torch.sum(torch.pow(batch_data_mean, 2) + torch.pow(batch_data_std, 2) - torch.log(
+            1e-8 + torch.pow(batch_data_std, 2)) - 1) / (
+                      batch_data.size()[0] * batch_data.size()[1] * batch_data.size()[2])
+        mse_loss = self.loss_function(batch_decode, batch_data)
+        return batch_hidden, mse_loss + kld
 
 
 #############################
@@ -127,6 +171,7 @@ class Seq2SeqBasic(torch.nn.Module):
             loss = self.LossFunction(input=decoder_predict_probability, target=abstract_label)
             return loss
 
+#############################
 
 # class Seq2SeqBasicBatch(Seq2SeqBasic):
 #     def __init__(self, dictionary_embedding, cuda_flag=True):
@@ -201,37 +246,37 @@ class Seq2SeqBasic(torch.nn.Module):
 #
 #         # decoder_predict_probability = torch.cat(decoder_predict_probability, dim=0)
 #         # print(numpy.shape(decoder_predict_probability))
-
-
-if __name__ == '__main__':
-    import os
-    from DataLoader import loader_summarization
-
-    cuda_flag = True
-
-    save_path = 'Result/BasicBatch'
-    if not os.path.exists(save_path): os.makedirs(save_path)
-    train_dataset, val_dataset, test_dataset, dictionary_embedding = loader_summarization(batch_size=4)
-
-    seq2seqBasic = Seq2SeqBasicBatch(dictionary_embedding, cuda_flag=cuda_flag)
-    if cuda_flag: seq2seqBasic.cuda()
-    optimizer = torch.optim.Adam(params=seq2seqBasic.parameters(), lr=5E-4)
-
-    for episode_index in range(100):
-        total_loss = 0.0
-    with open(os.path.join(save_path, 'Loss-%04d.csv' % episode_index), 'w') as file:
-        for batchIndex, [batchArticle, batchAbstract, batchAbstractLabel] in enumerate(train_dataset):
-            loss = seq2seqBasic(batchArticle, batchAbstract, batchAbstractLabel)
-            exit()
-            loss_value = loss.cpu().detach().numpy()
-            total_loss += loss_value
-            print('\rBatch %d Loss = %f' % (batchIndex, loss_value), end='')
-            file.write(str(loss_value) + '\n')
-
-            loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
-            # print('\nEpisode %d Total Loss = %f' % (episode_index, total_loss))
-            # torch.save(obj={'ModelStateDict': seq2seqBasic.state_dict(), 'OptimizerStateDict': optimizer.state_dict()},
-            #            f=os.path.join(save_path, 'Parameter-%04d.pkl' % episode_index))
-            # torch.save(obj=seq2seqBasic, f=os.path.join(save_path, 'Network-%04d.pkl' % episode_index))
+#
+#
+# if __name__ == '__main__':
+#     import os
+#     from DataLoader import loader_summarization
+#
+#     cuda_flag = True
+#
+#     save_path = 'Result/BasicBatch'
+#     if not os.path.exists(save_path): os.makedirs(save_path)
+#     train_dataset, val_dataset, test_dataset, dictionary_embedding = loader_summarization(batch_size=4)
+#
+#     seq2seqBasic = Seq2SeqBasicBatch(dictionary_embedding, cuda_flag=cuda_flag)
+#     if cuda_flag: seq2seqBasic.cuda()
+#     optimizer = torch.optim.Adam(params=seq2seqBasic.parameters(), lr=5E-4)
+#
+#     for episode_index in range(100):
+#         total_loss = 0.0
+#     with open(os.path.join(save_path, 'Loss-%04d.csv' % episode_index), 'w') as file:
+#         for batchIndex, [batchArticle, batchAbstract, batchAbstractLabel] in enumerate(train_dataset):
+#             loss = seq2seqBasic(batchArticle, batchAbstract, batchAbstractLabel)
+#             exit()
+#             loss_value = loss.cpu().detach().numpy()
+#             total_loss += loss_value
+#             print('\rBatch %d Loss = %f' % (batchIndex, loss_value), end='')
+#             file.write(str(loss_value) + '\n')
+#
+#             loss.backward()
+#             optimizer.step()
+#             optimizer.zero_grad()
+#             # print('\nEpisode %d Total Loss = %f' % (episode_index, total_loss))
+#             # torch.save(obj={'ModelStateDict': seq2seqBasic.state_dict(), 'OptimizerStateDict': optimizer.state_dict()},
+#             #            f=os.path.join(save_path, 'Parameter-%04d.pkl' % episode_index))
+#             # torch.save(obj=seq2seqBasic, f=os.path.join(save_path, 'Network-%04d.pkl' % episode_index))
