@@ -74,6 +74,25 @@ class SummarizationWordBagDataset(torch_utils_data.Dataset):
         return self.article[index]
 
 
+class SummarizationWithVAEDataset(torch_utils_data.Dataset):
+    def __init__(self, article, abstract, dictionary, topic):
+        self.article, self.abstract, self.dictionary, self.topic = article, abstract, dictionary, topic
+        assert len(article) == len(abstract) == len(topic)
+
+    def __len__(self):
+        return len(self.article)
+
+    def __getitem__(self, index):
+        article_tokens, abstract_tokens = [], []
+        for sub_index in range(len(self.article[index])):
+            article_tokens.append(self.dictionary[self.article[index][sub_index]])
+        for sub_index in range(len(self.abstract[index])):
+            abstract_tokens.append(self.dictionary[self.abstract[index][sub_index]])
+
+        return torch.FloatTensor(numpy.array(article_tokens)), torch.FloatTensor(
+            numpy.array(abstract_tokens)), self.abstract[index], torch.FloatTensor(self.topic[index])
+
+
 def loader_summarization_initial():
     def find_text(val_raw_data, search_index):
         distance = 2
@@ -145,7 +164,8 @@ def loader_summarization_initial():
     print('Initial Treat Completed')
 
 
-def loader_summarization(batch_size=32, cuda_flag=True, word_bag_flag=False, paragraph_number=None):
+def loader_summarization(batch_size=32, cuda_flag=True, word_bag_flag=False, paragraph_number=None, topic_flag=False,
+                         topic_name=None):
     load_path = 'C:/ProjectData/'
     if not os.path.exists(load_path + 'Data/Dictionary.pkl'): loader_summarization_initial()
     dictionary = pickle.load(open(load_path + 'Data/Dictionary.pkl', 'rb'))
@@ -181,6 +201,23 @@ def loader_summarization(batch_size=32, cuda_flag=True, word_bag_flag=False, par
     test_article = pickle.load(open(load_path + 'Data/test_article.pkl', 'rb'))
     test_abstract = pickle.load(open(load_path + 'Data/test_abstract.pkl', 'rb'))
 
+    if topic_flag:
+        train_vae = numpy.load(load_path + 'Data_VAE/%s-Train.npy' % topic_name)
+        val_vae = numpy.load(load_path + 'Data_VAE/%s-Val.npy' % topic_name)
+        test_vae = numpy.load(load_path + 'Data_VAE/%s-Test.npy' % topic_name)
+        print(numpy.shape(train_vae), numpy.shape(val_vae), numpy.shape(test_vae))
+
+        train_dataset = SummarizationWithVAEDataset(article=train_article, abstract=train_abstract,
+                                                    dictionary=dictionary_embedding, topic=train_vae)
+        val_dataset = SummarizationWithVAEDataset(article=val_article, abstract=val_abstract,
+                                                  dictionary=dictionary_embedding, topic=val_vae)
+        test_dataset = SummarizationWithVAEDataset(article=test_article, abstract=test_abstract,
+                                                   dictionary=dictionary_embedding, topic=test_vae)
+        train_loader = torch_utils_data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
+        val_loader = torch_utils_data.DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=True)
+        test_loader = torch_utils_data.DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
+        return train_loader, val_loader, test_loader, dictionary_embedding
+
     if not word_bag_flag:
         train_dataset = SummarizationDataset(article=train_article, abstract=train_abstract,
                                              dictionary=dictionary_embedding)
@@ -199,13 +236,13 @@ def loader_summarization(batch_size=32, cuda_flag=True, word_bag_flag=False, par
         val_dataset = SummarizationWordBagDataset(article=val_article, abstract=val_abstract)
         test_dataset = SummarizationWordBagDataset(article=test_article, abstract=test_abstract)
         train_loader = torch_utils_data.DataLoader(
-            dataset=train_dataset, batch_size=batch_size, shuffle=True,
+            dataset=train_dataset, batch_size=batch_size, shuffle=False,
             collate_fn=CollateWordBag(dictionary=dictionary, paragraph_number=paragraph_number))
         val_loader = torch_utils_data.DataLoader(
-            dataset=val_dataset, batch_size=batch_size, shuffle=True,
+            dataset=val_dataset, batch_size=batch_size, shuffle=False,
             collate_fn=CollateWordBag(dictionary=dictionary, paragraph_number=paragraph_number))
         test_loader = torch_utils_data.DataLoader(
-            dataset=test_dataset, batch_size=batch_size, shuffle=True,
+            dataset=test_dataset, batch_size=batch_size, shuffle=False,
             collate_fn=CollateWordBag(dictionary=dictionary, paragraph_number=paragraph_number))
 
     return train_loader, val_loader, test_loader, dictionary_embedding
@@ -214,7 +251,8 @@ def loader_summarization(batch_size=32, cuda_flag=True, word_bag_flag=False, par
 if __name__ == '__main__':
     # print(str(b"abc", "utf - 8"))
     train_loader, val_loader, test_loader, dictionary_embedding = loader_summarization(
-        word_bag_flag=True, batch_size=64, paragraph_number=5)
-    for batchIndex, batchArticle in enumerate(test_loader):
-        print(batchIndex, numpy.shape(batchArticle))
+        batch_size=1, topic_flag=True, topic_name='Result-VAE-1')
+    for batchIndex, [batchArticle, batchAbstract, batchAbstractLabel, batchTopic] in enumerate(test_loader):
+        print(batchIndex, numpy.shape(batchArticle), numpy.shape(batchAbstract), numpy.shape(batchAbstractLabel),
+              numpy.shape(batchTopic))
         # exit()

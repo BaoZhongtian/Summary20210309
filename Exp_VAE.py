@@ -5,13 +5,13 @@ from Model import VariationalAutoEncoder
 from DataLoader import loader_summarization
 
 if __name__ == '__main__':
-    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '1'
     cuda_flag = True
-    save_path = 'Result/VAE-3'
+    save_path = 'Result/VAE-1'
     if not os.path.exists(save_path): os.makedirs(save_path)
 
     train_loader, val_loader, test_loader, dictionary_embedding = loader_summarization(
-        word_bag_flag=True, batch_size=64, paragraph_number=3)
+        word_bag_flag=True, batch_size=64, paragraph_number=1)
     VAE = VariationalAutoEncoder()
     if cuda_flag: VAE.cuda()
     optimizer = torch.optim.Adam(params=VAE.parameters(), lr=5E-4)

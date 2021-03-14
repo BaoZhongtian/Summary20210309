@@ -77,7 +77,7 @@ class VariationalAutoEncoder(torch.nn.Module):
         batch_data_mean = self.encoder_mean(batch_data)
         batch_data_std = self.encoder_std(batch_data)
 
-        batch_hidden = batch_data_mean + torch.exp(batch_data_std) * torch.randn_like(batch_data_std)
+        batch_hidden = batch_data_mean + torch.exp(batch_data_std)# * torch.randn_like(batch_data_std)
         batch_decode = self.decoder(batch_hidden)
 
         kld = 0.5 * torch.sum(torch.pow(batch_data_mean, 2) + torch.pow(batch_data_std, 2) - torch.log(
