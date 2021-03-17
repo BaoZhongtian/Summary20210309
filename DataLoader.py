@@ -17,6 +17,15 @@ class CollateSummarization:
         return xs, ys, zs
 
 
+class CollateTopicSummarization:
+    def __call__(self, batch):
+        ws = [v[0] for v in batch]
+        xs = [v[1] for v in batch]
+        ys = [v[2] for v in batch]
+        zs = [v[3] for v in batch]
+        return ws, xs, ys, zs
+
+
 class CollateWordBag:
     def __init__(self, dictionary, paragraph_number):
         self.paragraph_number = paragraph_number
@@ -107,6 +116,10 @@ def loader_summarization_initial():
         current_article, current_abstract = [], []
         with open(os.path.join(load_path, part_name), 'rb') as file:
             val_raw_data = file.readlines()
+
+        for sample in val_raw_data[0:50]:
+            print(sample)
+        exit()
         for searchIndex in tqdm.trange(len(val_raw_data)):
             if val_raw_data[searchIndex][1:len('\x07article')] == b'article':
                 current_article.append(find_text(val_raw_data, searchIndex))
@@ -118,8 +131,8 @@ def loader_summarization_initial():
 
     load_path = 'C:/ProjectData/finished_files/'
 
-    train_article, train_abstract = load_part(part_name='train.bin')
-    val_article, val_abstract = load_part(part_name='val.bin')
+    # train_article, train_abstract = load_part(part_name='train.bin')
+    # val_article, val_abstract = load_part(part_name='val.bin')
     test_article, test_abstract = load_part(part_name='test.bin')
 
     ##########################################
@@ -194,15 +207,15 @@ def loader_summarization(batch_size=32, cuda_flag=True, word_bag_flag=False, par
     dictionary_embedding = pickle.load(open(load_path + 'Data/Dictionary_Embedding.pkl', 'rb'))
 
     print('Reading pickle data...')
-    train_article = pickle.load(open(load_path + 'Data/train_article.pkl', 'rb'))
-    train_abstract = pickle.load(open(load_path + 'Data/train_abstract.pkl', 'rb'))
+    train_article = pickle.load(open(load_path + 'Data/train_article.pkl', 'rb'))[0:10000]
+    train_abstract = pickle.load(open(load_path + 'Data/train_abstract.pkl', 'rb'))[0:10000]
     val_article = pickle.load(open(load_path + 'Data/val_article.pkl', 'rb'))
     val_abstract = pickle.load(open(load_path + 'Data/val_abstract.pkl', 'rb'))
     test_article = pickle.load(open(load_path + 'Data/test_article.pkl', 'rb'))
     test_abstract = pickle.load(open(load_path + 'Data/test_abstract.pkl', 'rb'))
 
     if topic_flag:
-        train_vae = numpy.load(load_path + 'Data_VAE/%s-Train.npy' % topic_name)
+        train_vae = numpy.load(load_path + 'Data_VAE/%s-Train.npy' % topic_name)[0:10000]
         val_vae = numpy.load(load_path + 'Data_VAE/%s-Val.npy' % topic_name)
         test_vae = numpy.load(load_path + 'Data_VAE/%s-Test.npy' % topic_name)
         print(numpy.shape(train_vae), numpy.shape(val_vae), numpy.shape(test_vae))
@@ -213,9 +226,12 @@ def loader_summarization(batch_size=32, cuda_flag=True, word_bag_flag=False, par
                                                   dictionary=dictionary_embedding, topic=val_vae)
         test_dataset = SummarizationWithVAEDataset(article=test_article, abstract=test_abstract,
                                                    dictionary=dictionary_embedding, topic=test_vae)
-        train_loader = torch_utils_data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
-        val_loader = torch_utils_data.DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=True)
-        test_loader = torch_utils_data.DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
+        train_loader = torch_utils_data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True,
+                                                   collate_fn=CollateTopicSummarization())
+        val_loader = torch_utils_data.DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=True,
+                                                 collate_fn=CollateTopicSummarization())
+        test_loader = torch_utils_data.DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False,
+                                                  collate_fn=CollateTopicSummarization())
         return train_loader, val_loader, test_loader, dictionary_embedding
 
     if not word_bag_flag:
@@ -249,10 +265,15 @@ def loader_summarization(batch_size=32, cuda_flag=True, word_bag_flag=False, par
 
 
 if __name__ == '__main__':
+    loader_summarization_initial()
+    exit()
     # print(str(b"abc", "utf - 8"))
     train_loader, val_loader, test_loader, dictionary_embedding = loader_summarization(
-        batch_size=1, topic_flag=True, topic_name='Result-VAE-1')
+        batch_size=16, topic_flag=True, topic_name='Result-VAE-1')
     for batchIndex, [batchArticle, batchAbstract, batchAbstractLabel, batchTopic] in enumerate(test_loader):
-        print(batchIndex, numpy.shape(batchArticle), numpy.shape(batchAbstract), numpy.shape(batchAbstractLabel),
-              numpy.shape(batchTopic))
-        # exit()
+        # print(batchIndex, numpy.shape(batchArticle), numpy.shape(batchAbstract), numpy.shape(batchAbstractLabel),
+        #       numpy.shape(batchTopic))
+        for index in range(len(batchArticle)):
+            print(numpy.shape(batchArticle[index]), numpy.shape(batchAbstract[index]),
+                  numpy.shape(batchAbstractLabel[index]), numpy.shape(batchTopic[index]))
+        exit()

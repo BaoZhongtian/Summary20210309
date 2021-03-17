@@ -8,7 +8,7 @@ from DataLoader import loader_summarization
 if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = '0'
     cuda_flag = True
-    paragraph_number = 3
+    paragraph_number = 5
     load_path = 'Result/VAE-%d' % paragraph_number
 
     train_loader, val_loader, test_loader, dictionary_embedding = loader_summarization(

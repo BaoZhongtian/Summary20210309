@@ -77,7 +77,7 @@ class VariationalAutoEncoder(torch.nn.Module):
         batch_data_mean = self.encoder_mean(batch_data)
         batch_data_std = self.encoder_std(batch_data)
 
-        batch_hidden = batch_data_mean + torch.exp(batch_data_std)# * torch.randn_like(batch_data_std)
+        batch_hidden = batch_data_mean + torch.exp(batch_data_std)  # * torch.randn_like(batch_data_std)
         batch_decode = self.decoder(batch_hidden)
 
         kld = 0.5 * torch.sum(torch.pow(batch_data_mean, 2) + torch.pow(batch_data_std, 2) - torch.log(
@@ -168,6 +168,103 @@ class Seq2SeqBasic(torch.nn.Module):
 
             decoder_predict_probability = torch.cat(decoder_predict_probability, dim=0)
 
+            loss = self.LossFunction(input=decoder_predict_probability, target=abstract_label)
+            return loss
+
+
+class Seq2SeqTopicBatch(Seq2SeqBasic):
+    def __init__(self, dictionary_embedding, cuda_flag=True):
+        super(Seq2SeqTopicBatch, self).__init__(dictionary_embedding=dictionary_embedding, cuda_flag=cuda_flag)
+
+        self.Predict_Decoder_Layer = torch.nn.Linear(in_features=1024, out_features=len(self.index2dictionary.keys()))
+        self.Topic_Expand_Layer = torch.nn.Linear(in_features=50, out_features=1024)
+        self.LossFunction = torch.nn.CrossEntropyLoss(ignore_index=0)
+
+    def input_padding(self, article):
+        article_padding = []
+        article_length = torch.LongTensor([len(sample) for sample in article])
+        article_max_length = numpy.max([len(sample) for sample in article])
+
+        for sample in article:
+            if len(sample.size()) < 2:
+                sample = torch.zeros([1, 1024])
+            article_sample = torch.cat(
+                [sample, torch.zeros([article_max_length - sample.size()[0], sample.size()[1]])],
+                dim=0).unsqueeze(0)
+            article_padding.append(article_sample)
+        article_padding = torch.cat(article_padding, dim=0)
+        return article_padding, article_length
+
+    def forward(self, article, abstract=None, abstract_label_raw=None, topic=None):
+        # article_pretreatment = []
+        # for sample in article:
+        #     if len(sample.size()) == 1: continue
+        #     article_pretreatment.append(sample)
+        article_padding, article_length = self.input_padding(article)
+        abstract_padding, abstract_length = self.input_padding(abstract)
+
+        topic = torch.cat(topic, dim=0)
+
+        abstract_label = []
+        abstract_max_length = numpy.max([len(sample) for sample in abstract_label_raw])
+        for index in range(len(abstract_label_raw)):
+            sample = []
+            for index_sample in range(len(abstract_label_raw[index])):
+                sample.append(self.dictionary2index[abstract_label_raw[index][index_sample]])
+            sample = numpy.concatenate([sample, numpy.zeros(abstract_max_length - len(sample))], axis=0)
+            abstract_label.append(sample)
+        abstract_label = torch.LongTensor(abstract_label)
+        # print(abstract_label_raw[0])
+        # print(abstract_label[0])
+        # print(numpy.shape(abstract_label))
+        # exit()
+
+        if self.CudaFlag:
+            article_padding = article_padding.cuda()
+            abstract_label = abstract_label.cuda()
+            topic = topic.cuda()
+
+        encoder_output, lstm_state = self.BLSTM_Encoder_Layer(article_padding)
+
+        decoder_input = self.SOS_Embedding.repeat([encoder_output.size()[0], 1, 1])
+        decoder_state = [torch.cat([lstm_state[0][0], lstm_state[0][1]], dim=-1).unsqueeze(0),
+                         torch.cat([lstm_state[1][0], lstm_state[1][1]], dim=-1).unsqueeze(0)]
+
+        topic_expand = self.Topic_Expand_Layer(topic).unsqueeze(1)
+
+        if abstract is not None:
+            decoder_predict_probability = []
+
+            random_choose = numpy.random.random()
+            for _ in range(abstract_padding.size()[1]):
+                decoder_output, decoder_state = self.LSTM_Decoder_Layer(decoder_input, hx=decoder_state)
+                decoder_predict = self.Predict_Decoder_Layer(decoder_output)
+                decoder_predict_probability.append(decoder_predict)
+                decoder_predict_value = decoder_predict.argmax(dim=-1)
+
+                decoder_predict_numpy = decoder_predict_value.squeeze().detach().cpu().numpy()
+
+                if random_choose > 0.5:
+                    decoder_input = [torch.FloatTensor(
+                        self.Dictionary[self.index2dictionary[decoder_predict_numpy[index]]]).unsqueeze(0).unsqueeze(0)
+                                     for index in range(len(decoder_predict_numpy))]
+                    decoder_input = torch.cat(decoder_input, dim=0)
+                else:
+                    decoder_input = abstract_padding[:, _, :].unsqueeze(1)
+
+                if self.CudaFlag: decoder_input = decoder_input.cuda()
+
+                decoder_input = torch.cat([decoder_input, topic_expand], dim=-1)
+            decoder_predict_probability = torch.cat(decoder_predict_probability, dim=1)
+
+            decoder_predict_probability = decoder_predict_probability.view(
+                [decoder_predict_probability.size()[0] * decoder_predict_probability.size()[1],
+                 decoder_predict_probability.size()[2]])
+            abstract_label = abstract_label.view([abstract_label.size()[0] * abstract_label.size()[1]])
+            # print(numpy.shape(decoder_predict_probability), numpy.shape(abstract_label))
+            # exit()
+            if self.CudaFlag:
+                abstract_label = abstract_label.cuda()
             loss = self.LossFunction(input=decoder_predict_probability, target=abstract_label)
             return loss
 

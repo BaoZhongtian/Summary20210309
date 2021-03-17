@@ -5,18 +5,18 @@ from Model import VariationalAutoEncoder
 from DataLoader import loader_summarization
 
 if __name__ == '__main__':
-    os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
     cuda_flag = True
-    save_path = 'Result/VAE-1'
+    save_path = 'Result/VAE-5'
     if not os.path.exists(save_path): os.makedirs(save_path)
 
     train_loader, val_loader, test_loader, dictionary_embedding = loader_summarization(
-        word_bag_flag=True, batch_size=64, paragraph_number=1)
+        word_bag_flag=True, batch_size=64, paragraph_number=5)
     VAE = VariationalAutoEncoder()
     if cuda_flag: VAE.cuda()
     optimizer = torch.optim.Adam(params=VAE.parameters(), lr=5E-4)
 
-    for episode_index in range(100):
+    for episode_index in range(1):
         total_loss = 0.0
         with open(os.path.join(save_path, 'Loss-%04d.csv' % episode_index), 'w') as file:
             for batchIndex, batchArticle in enumerate(train_loader):
