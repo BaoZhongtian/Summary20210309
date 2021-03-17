@@ -5,7 +5,7 @@ import pytorch_pretrained_bert
 if __name__ == '__main__':
     tokenizer = pytorch_pretrained_bert.BertTokenizer.from_pretrained('bert-large-uncased')
 
-    data = '[PAD] I eat an apple.'
+    data = '[CLS] I eat an apple.'
 
     tokenized_text = tokenizer.tokenize(data)
     print(tokenized_text)

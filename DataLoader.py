@@ -1,17 +1,24 @@
 import os
-import numpy
 import pickle
-import torch
+import numpy
 import torch.utils.data as torch_utils_data
-from torch.nn.functional import embedding
 
 
 class CollateSummarization:
+    def __pad__(self, data):
+        data_length = [len(sample) for sample in data]
+        data_max_length = max(data_length)
+        data_pad = []
+        for sample in data:
+            data_pad.append(numpy.concatenate([sample, numpy.zeros(data_max_length - len(sample))]))
+        return data_pad, data_length
+
     def __call__(self, batch):
         xs = [v[0] for v in batch]
+        xs_pad, xs_length = self.__pad__(xs)
         ys = [v[1] for v in batch]
-
-        return xs, ys
+        ys_pad, ys_length = self.__pad__(ys)
+        return xs_pad, xs_length, ys_pad, ys_length
 
 
 class SummarizationDataset(torch_utils_data.Dataset):
@@ -65,7 +72,7 @@ def load_summarization(batch_size=8):
 
 if __name__ == '__main__':
     train_loader, _, _, _ = load_summarization()
-    for batch_index, [batch_article, batch_abstract] in enumerate(train_loader):
-        print(batch_article)
-        print(batch_abstract)
-        exit()
+    for batch_index, [batch_article, batch_article_length, batch_abstract, batch_abstract_length] in enumerate(
+            train_loader):
+        print(batch_index, numpy.shape(batch_article), numpy.shape(batch_abstract))
+        # exit()
