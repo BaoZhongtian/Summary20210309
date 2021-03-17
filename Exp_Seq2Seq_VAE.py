@@ -2,7 +2,7 @@ import os
 import torch
 import numpy
 from Model import Seq2SeqTopicBatch
-from DataLoader import loader_summarization
+from DataLoader_Old import loader_summarization
 
 if __name__ == '__main__':
     # os.environ['CUDA_VISIBLE_DEVICES'] = '1'

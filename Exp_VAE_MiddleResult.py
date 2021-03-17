@@ -3,7 +3,7 @@ import tqdm
 import torch
 import numpy
 from Model import VariationalAutoEncoder
-from DataLoader import loader_summarization
+from DataLoader_Old import loader_summarization
 
 if __name__ == '__main__':
     os.environ['CUDA_VISIBLE_DEVICES'] = '0'

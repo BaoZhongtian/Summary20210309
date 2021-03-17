@@ -1,7 +1,7 @@
 import os
 import torch
 from Model import Seq2SeqBasic
-from DataLoader import loader_summarization
+from DataLoader_Old import loader_summarization
 
 if __name__ == '__main__':
     cuda_flag = True
