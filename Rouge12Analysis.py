@@ -31,18 +31,16 @@ def Rouge_2(model, reference):  # terms_reference为参考摘要，terms_model�
 
 
 if __name__ == '__main__':
-    with open('Predict.csv', 'r') as file:
-        predict_data = file.readlines()
-    with open('Label.csv', 'r') as file:
-        label_data = file.readlines()
+    for file_index in range(40):
+        with open('Result/BasicSingle/Predict-%04d.csv' % file_index, 'r') as file:
+            predict_data = file.readlines()
+        with open('Result/BasicSingle/Label-%04d.csv' % file_index, 'r') as file:
+            label_data = file.readlines()
 
-    print(len(predict_data), len(label_data))
-
-    total_weight_r1, total_weight_r2 = 0.0, 0.0
-    for index in range(len(predict_data)):
-        total_weight_r1 += Rouge_1(predict_data[index].split(','), label_data[index].split(','))
-        total_weight_r2 += Rouge_2(predict_data[index].split(','), label_data[index].split(','))
-    total_weight_r1 /= len(predict_data)
-    total_weight_r2 /= len(predict_data)
-    print(total_weight_r1)
-    print(total_weight_r2)
+        total_weight_r1, total_weight_r2 = 0.0, 0.0
+        for index in range(len(predict_data)):
+            total_weight_r1 += Rouge_1(predict_data[index].split(','), label_data[index].split(','))
+            total_weight_r2 += Rouge_2(predict_data[index].split(','), label_data[index].split(','))
+        total_weight_r1 /= len(predict_data)
+        total_weight_r2 /= len(predict_data)
+        print(total_weight_r1, total_weight_r2)
