@@ -12,7 +12,7 @@ if __name__ == '__main__':
 
     seq2seqBasic = Seq2SeqBasic(cuda_flag=cuda_flag)
 
-    for parameter_index in range(40):
+    for parameter_index in range(99, 100):
         print('Treating', parameter_index)
         load_path = 'Result/BasicSingle/Parameter-%04d.pkl' % parameter_index
         checkpoint = torch.load(load_path)
@@ -24,7 +24,8 @@ if __name__ == '__main__':
         predict_file = open('Result/BasicSingle/Predict-%04d.csv' % parameter_index, 'w')
         label_file = open('Result/BasicSingle/Label-%04d.csv' % parameter_index, 'w')
         for batchIndex, [batchArticle, batchArticleLength, batchAbstract, batchAbstractLength] in tqdm.tqdm(
-                enumerate(test_dataset)):
+                enumerate(train_dataset)):
+            if batchIndex > 100: exit()
             decoder_predict_result = seq2seqBasic(
                 dictionary_embedding, batchArticle, batchArticleLength, batchAbstract, batchAbstractLength,
                 decode_flag=True)

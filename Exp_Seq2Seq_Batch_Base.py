@@ -14,7 +14,7 @@ if __name__ == '__main__':
 
     seq2seqBasic = Seq2SeqBasic(cuda_flag=cuda_flag)
     if cuda_flag: seq2seqBasic.cuda()
-    optimizer = torch.optim.Adam(params=seq2seqBasic.parameters(), lr=5E-4)
+    optimizer = torch.optim.Adam(params=seq2seqBasic.parameters(), lr=1E-3)
 
     for episode_index in range(100):
         total_loss = 0.0

@@ -16,9 +16,9 @@ if __name__ == '__main__':
 
     seq2seqBasic = Seq2SeqWTopic(cuda_flag=cuda_flag)
     if cuda_flag: seq2seqBasic.cuda()
-    optimizer = torch.optim.Adam(params=seq2seqBasic.parameters(), lr=5E-4)
+    optimizer = torch.optim.Adam(params=seq2seqBasic.parameters(), lr=1E-3)
 
-    for episode_index in range(10):
+    for episode_index in range(100):
         total_loss = 0.0
         with open(os.path.join(save_path, 'Loss-%04d.csv' % episode_index), 'w') as file:
             for batchIndex, [batchArticle, batchArticleLength, batchAbstract, batchAbstractLength,
@@ -36,7 +36,7 @@ if __name__ == '__main__':
                 optimizer.step()
                 optimizer.zero_grad()
 
-                if batchIndex % 10000 == 0:
+                if batchIndex % 1000 == 0:
                     torch.save(
                         obj={'ModelStateDict': seq2seqBasic.state_dict(), 'OptimizerStateDict': optimizer.state_dict()},
                         f=os.path.join(save_path, 'Parameter-%04d.pkl' % episode_index))

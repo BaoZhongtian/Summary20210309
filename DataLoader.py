@@ -94,6 +94,7 @@ def load_summarization(batch_size=8, max_length=600, paragraph_number=None):
     #########################################
 
     train_article_neo, val_article_neo, test_article_neo = [], [], []
+    train_abstract_neo = []
     for sample in train_article:
         if len(sample) > max_length:
             train_article_neo.append(sample[0:max_length])
@@ -109,6 +110,14 @@ def load_summarization(batch_size=8, max_length=600, paragraph_number=None):
             test_article_neo.append(sample[0:max_length])
         else:
             test_article_neo.append(sample)
+    ##########################
+    for sample in train_abstract:
+        if len(sample) > max_length:
+            train_abstract_neo.append(sample[0:max_length])
+        else:
+            train_abstract_neo.append(sample)
+    train_abstract = train_abstract_neo
+    ##########################
     train_article_cut, val_article_cut, test_article_cut = train_article_neo, val_article_neo, test_article_neo
 
     print(numpy.shape(dictionary_embedding))
@@ -150,12 +159,14 @@ def load_summarization(batch_size=8, max_length=600, paragraph_number=None):
 
 
 if __name__ == '__main__':
-    train_loader, _, _, _ = load_summarization(paragraph_number=5)
+    import pytorch_pretrained_bert
+
+    train_loader, _, test_loader, _ = load_summarization(paragraph_number=5)
+    tokenizer = pytorch_pretrained_bert.BertTokenizer.from_pretrained('bert-large-uncased')
     for batch_index, [batch_article, batch_article_length, batch_abstract, batch_abstract_length,
-                      paragraph] in enumerate(
-        train_loader):
-        print(batch_article_length)
-        print(batch_index, numpy.shape(batch_article), numpy.shape(batch_abstract))
-        print(numpy.shape(paragraph))
-        print(numpy.sum(paragraph, axis=-1))
+                      paragraph] in enumerate(test_loader):
+        for sample in batch_abstract:
+            print(sample)
+            print(tokenizer.convert_ids_to_tokens(sample))
+
         exit()

@@ -92,11 +92,12 @@ class Seq2SeqBasic(torch.nn.Module):
                 # print(numpy.shape(decoder_predict))
                 decoder_predict_value = decoder_predict.argmax(dim=-1)
 
-                if random_choose < 0.5:
-                    decoder_input = embedding(input=decoder_predict_value, weight=word_embedding)
-                else:
-                    # print(word_index, numpy.shape(abstract))
-                    decoder_input = embedding(input=abstract[:, word_index:word_index + 1], weight=word_embedding)
+                ecoder_input = embedding(input=decoder_predict_value, weight=word_embedding)
+                # if random_choose < 0.5:
+                #     decoder_input = embedding(input=decoder_predict_value, weight=word_embedding)
+                # else:
+                #     # print(word_index, numpy.shape(abstract))
+                #     decoder_input = embedding(input=abstract[:, word_index:word_index + 1], weight=word_embedding)
 
             decoder_predict_probability = torch.cat(decoder_predict_probability, dim=1)
 
@@ -184,10 +185,11 @@ class Seq2SeqWAttention(Seq2SeqBasic):
                 decoder_predict = self.Predict_Decoder_Layer(decoder_output)
                 decoder_predict_probability.append(decoder_predict)
                 decoder_predict_value = decoder_predict.argmax(dim=-1)
-                if random_choose < 0.5:
-                    decoder_input = embedding(input=decoder_predict_value, weight=word_embedding)
-                else:
-                    decoder_input = embedding(input=abstract[:, word_index:word_index + 1], weight=word_embedding)
+                decoder_input = embedding(input=abstract[:, word_index:word_index + 1], weight=word_embedding)
+                # if random_choose < 0.5:
+                #     decoder_input = embedding(input=decoder_predict_value, weight=word_embedding)
+                # else:
+                #     decoder_input = embedding(input=abstract[:, word_index:word_index + 1], weight=word_embedding)
 
                 decoder_weight_h = self.AttentionWeight_H_Layer(decoder_output).repeat([1, article.size()[1], 1])
                 decoder_weight_add = encoder_weight_s + decoder_weight_h
@@ -216,7 +218,7 @@ class Seq2SeqWAttention(Seq2SeqBasic):
 
 class Seq2SeqWTopic(Seq2SeqWAttention):
     def __init__(self, lstm_size=128, cuda_flag=True):
-        super(Seq2SeqWTopic, self).__init__(cuda_flag=cuda_flag)
+        super(Seq2SeqWTopic, self).__init__(lstm_size=lstm_size, cuda_flag=cuda_flag)
         self.LSTM_Decoder_Layer = torch.nn.LSTM(
             input_size=2048, hidden_size=lstm_size * 2, num_layers=1, batch_first=True)
 
@@ -269,7 +271,7 @@ class Seq2SeqWTopic(Seq2SeqWAttention):
         paragraph_mean = self.Topic_Average_Layer(paragraph_2nd)
         paragraph_std = self.Topic_Std_Layer(paragraph_2nd)
 
-        paragraph_vector = paragraph_mean + torch.exp(paragraph_std) * torch.randn_like(paragraph_std)
+        paragraph_vector = paragraph_mean + paragraph_std * torch.randn_like(paragraph_std)
         paragraph_weight_w = self.TopicWeight_W_Layer(paragraph_vector)
 
         #######################################
@@ -289,15 +291,15 @@ class Seq2SeqWTopic(Seq2SeqWAttention):
                 decoder_predict_probability.append(decoder_predict)
                 decoder_predict_value = decoder_predict.argmax(dim=-1)
 
-                if random_choose < 0.5:
-                    decoder_input = embedding(input=decoder_predict_value, weight=word_embedding)
-                else:
-                    decoder_input = embedding(input=abstract[:, word_index:word_index + 1], weight=word_embedding)
+                decoder_input = embedding(input=abstract[:, word_index:word_index + 1], weight=word_embedding)
+                # if random_choose < 0.5:
+                #     decoder_input = embedding(input=decoder_predict_value, weight=word_embedding)
+                # else:
+                #     decoder_input = embedding(input=abstract[:, word_index:word_index + 1], weight=word_embedding)
 
                 paragraph_weight_s = self.TopicWeight_S_Layer(decoder_output).repeat(
                     [1, paragraph_weight_w.size()[1], 1])
                 paragraph_weight_add = paragraph_weight_w + paragraph_weight_s
-                paragraph_weight_add = paragraph_weight_add.tanh()
                 paragraph_weight_final = self.TopicWeight_Final_Layer(paragraph_weight_add)
                 paragraph_weight_final = paragraph_weight_final.softmax(dim=1).repeat([1, 1, 1024])
 
@@ -305,6 +307,8 @@ class Seq2SeqWTopic(Seq2SeqWAttention):
                 topic_weighted = topic_weighted_raw.sum(dim=1).unsqueeze(1)
 
                 decoder_input = torch.cat([decoder_input, topic_weighted], dim=-1)
+                # decoder_input = torch.cat([decoder_input, torch.zeros([decoder_input.size()[0], 1, 1024]).cuda()],
+                #                           dim=-1)
 
             decoder_predict_probability = torch.cat(decoder_predict_probability, dim=1)
 
@@ -314,11 +318,19 @@ class Seq2SeqWTopic(Seq2SeqWAttention):
             abstract = abstract.view([abstract.size()[0] * abstract.size()[1]])
 
             loss = self.LossFunction(input=decoder_predict_probability, target=abstract)
-            kld = 0.5 * torch.sum(torch.pow(paragraph_mean, 2) + torch.pow(paragraph_std, 2) - torch.log(
-                1e-8 + torch.pow(paragraph_std, 2)) - 1) / (
-                          paragraph_mean.size()[0] * paragraph_mean.size()[1] * paragraph_mean.size()[2])
+            return loss
+            # kld = 0.5 * torch.sum(torch.pow(paragraph_mean, 2) + torch.pow(paragraph_std, 2) - torch.log(
+            #     1e-8 + torch.pow(paragraph_std, 2)) - 1) / (
+            #               paragraph_mean.size()[0] * paragraph_mean.size()[1] * paragraph_mean.size()[2])
+            # if 10 > kld > 0:
+            #     return loss + kld
+            # else:
+            #     return loss
 
-            return loss + kld
+
+class VHTM(Seq2SeqWTopic):
+    def __init__(self, lstm_size=128, cuda_flag=True):
+        super(VHTM, self).__init__(lstm_size=lstm_size, cuda_flag=cuda_flag)
 
 
 if __name__ == '__main__':
