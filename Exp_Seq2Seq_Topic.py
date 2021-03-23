@@ -36,7 +36,7 @@ if __name__ == '__main__':
                 optimizer.step()
                 optimizer.zero_grad()
 
-                if batchIndex % 1000 == 0:
+                if batchIndex % 1000 == 999:
                     torch.save(
                         obj={'ModelStateDict': seq2seqBasic.state_dict(), 'OptimizerStateDict': optimizer.state_dict()},
                         f=os.path.join(save_path, 'Parameter-%04d.pkl' % episode_index))

@@ -171,7 +171,7 @@ class Seq2SeqWAttention(Seq2SeqBasic):
         decoder_state = [torch.cat([article_encoder_state[0][0], article_encoder_state[0][1]], dim=-1).unsqueeze(0),
                          torch.cat([article_encoder_state[1][0], article_encoder_state[1][1]], dim=-1).unsqueeze(0)]
 
-        if abstract is not None:
+        if not decode_flag:
             random_choose = numpy.random.random()
 
             if self.cuda_flag:
@@ -214,6 +214,37 @@ class Seq2SeqWAttention(Seq2SeqBasic):
             loss = self.LossFunction(input=decoder_predict_probability, target=abstract)
 
             return loss
+
+        else:
+            if self.cuda_flag:
+                decoder_input = decoder_input.cuda()
+                abstract = abstract.cuda()
+
+            decoder_predict_probability = []
+            encoder_weight_s = self.AttentionWeight_S_Layer(article_encoder_output)
+            for word_index in range(abstract.size()[1]):
+                decoder_output, decoder_state = self.LSTM_Decoder_Layer(decoder_input, hx=decoder_state)
+                decoder_predict = self.Predict_Decoder_Layer(decoder_output)
+                decoder_predict_probability.append(decoder_predict)
+                decoder_predict_value = decoder_predict.argmax(dim=-1)
+                decoder_input = embedding(input=decoder_predict_value, weight=word_embedding)
+
+                decoder_weight_h = self.AttentionWeight_H_Layer(decoder_output).repeat([1, article.size()[1], 1])
+                decoder_weight_add = encoder_weight_s + decoder_weight_h
+                decoder_weight_add = decoder_weight_add.tanh()
+                decoder_weight = self.AttentionWeight_Final_Layer(decoder_weight_add).squeeze()
+                decoder_weight = torch.min(decoder_weight, article_mask).softmax(dim=-1)
+
+                decoder_weight_pad = decoder_weight.unsqueeze(-1).repeat([1, 1, self.lstm_size * 2])
+                decoder_attention_result = article_encoder_output * decoder_weight_pad
+                decoder_attention_result = torch.sum(decoder_attention_result, dim=1).unsqueeze(1)
+                decoder_input = torch.cat([decoder_input, decoder_attention_result], dim=-1)
+                # print(numpy.shape(decoder_input), numpy.shape(decoder_attention_result))
+                # exit()
+
+            decoder_predict_probability = torch.cat(decoder_predict_probability, dim=1)
+            decoder_predict_result = decoder_predict_probability.argmax(dim=-1)
+            return decoder_predict_result
 
 
 class Seq2SeqWTopic(Seq2SeqWAttention):
@@ -322,10 +353,8 @@ class Seq2SeqWTopic(Seq2SeqWAttention):
             # kld = 0.5 * torch.sum(torch.pow(paragraph_mean, 2) + torch.pow(paragraph_std, 2) - torch.log(
             #     1e-8 + torch.pow(paragraph_std, 2)) - 1) / (
             #               paragraph_mean.size()[0] * paragraph_mean.size()[1] * paragraph_mean.size()[2])
-            # if 10 > kld > 0:
-            #     return loss + kld
-            # else:
-            #     return loss
+            #
+            # return loss + kld
 
 
 class VHTM(Seq2SeqWTopic):

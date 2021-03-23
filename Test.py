@@ -6,9 +6,9 @@ if __name__ == '__main__':
 
     tokenizer = pytorch_pretrained_bert.BertTokenizer.from_pretrained('bert-large-uncased')
 
-    with open('Result/BasicSingle/Predict-0099.csv', 'r') as file:
+    with open('Result/Attention/Predict-0003.csv', 'r') as file:
         predict_data = file.readlines()
-    with open('Result/BasicSingle/Label-0099.csv', 'r') as file:
+    with open('Result/Attention/Label-0003.csv', 'r') as file:
         label_data = file.readlines()
     for index in range(10):
         data = [int(sample) for sample in predict_data[index].split(',')]

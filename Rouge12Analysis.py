@@ -31,10 +31,10 @@ def Rouge_2(model, reference):  # terms_reference为参考摘要，terms_model�
 
 
 if __name__ == '__main__':
-    for file_index in range(39, 40):
-        with open('Result/BasicSingle/Predict-%04d.csv' % file_index, 'r') as file:
+    for file_index in range(3, 4):
+        with open('Result/Attention/Predict-%04d.csv' % file_index, 'r') as file:
             predict_data = file.readlines()
-        with open('Result/BasicSingle/Label-%04d.csv' % file_index, 'r') as file:
+        with open('Result/Attention/Label-%04d.csv' % file_index, 'r') as file:
             label_data = file.readlines()
 
         total_weight_r1, total_weight_r2 = 0.0, 0.0

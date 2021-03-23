@@ -84,8 +84,8 @@ def load_summarization(batch_size=8, max_length=600, paragraph_number=None):
         else:
             dictionary_embedding.append(dictionary_embedding_raw[0])
 
-    train_article = pickle.load(open(os.path.join(load_path, 'train-article.pkl'), 'rb'))
-    train_abstract = pickle.load(open(os.path.join(load_path, 'train-abstract.pkl'), 'rb'))
+    train_article = pickle.load(open(os.path.join(load_path, 'train-article.pkl'), 'rb'))[0:100]
+    train_abstract = pickle.load(open(os.path.join(load_path, 'train-abstract.pkl'), 'rb'))[0:100]
     val_article = pickle.load(open(os.path.join(load_path, 'val-article.pkl'), 'rb'))
     val_abstract = pickle.load(open(os.path.join(load_path, 'val-abstract.pkl'), 'rb'))
     test_article = pickle.load(open(os.path.join(load_path, 'test-article.pkl'), 'rb'))
