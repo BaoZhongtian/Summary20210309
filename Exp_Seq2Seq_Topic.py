@@ -40,7 +40,10 @@ if __name__ == '__main__':
                     torch.save(
                         obj={'ModelStateDict': seq2seqBasic.state_dict(), 'OptimizerStateDict': optimizer.state_dict()},
                         f=os.path.join(save_path, 'Parameter-%04d.pkl' % episode_index))
-                    torch.save(obj=seq2seqBasic, f=os.path.join(save_path, 'Network-%04d.pkl' % episode_index))
+                if batchIndex % 10000 == 9999:
+                    torch.save(
+                        obj={'ModelStateDict': seq2seqBasic.state_dict(), 'OptimizerStateDict': optimizer.state_dict()},
+                        f=os.path.join(save_path, 'Parameter-%04d-%d.pkl' % (episode_index, batchIndex)))
         print('\nEpisode %d Total Loss = %f' % (episode_index, total_loss))
         torch.save(obj={'ModelStateDict': seq2seqBasic.state_dict(), 'OptimizerStateDict': optimizer.state_dict()},
                    f=os.path.join(save_path, 'Parameter-%04d.pkl' % episode_index))

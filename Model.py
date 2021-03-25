@@ -255,10 +255,10 @@ class Seq2SeqWTopic(Seq2SeqWAttention):
 
         self.Topic_Weight_Layer1st = torch.nn.Linear(in_features=30611, out_features=1024)
         self.Topic_Weight_Layer2nd = torch.nn.Linear(in_features=1024, out_features=1024)
-        self.Topic_Average_Layer = torch.nn.Linear(in_features=1024, out_features=1024)
-        self.Topic_Std_Layer = torch.nn.Linear(in_features=1024, out_features=1024)
+        self.Topic_Average_Layer = torch.nn.Linear(in_features=1024, out_features=768)
+        self.Topic_Std_Layer = torch.nn.Linear(in_features=1024, out_features=768)
 
-        self.TopicWeight_W_Layer = torch.nn.Linear(in_features=1024, out_features=64)
+        self.TopicWeight_W_Layer = torch.nn.Linear(in_features=768, out_features=64)
         self.TopicWeight_S_Layer = torch.nn.Linear(in_features=lstm_size * 2, out_features=64)
         self.TopicWeight_Final_Layer = torch.nn.Linear(in_features=64, out_features=1)
 
@@ -315,7 +315,7 @@ class Seq2SeqWTopic(Seq2SeqWAttention):
                 abstract = abstract.cuda()
 
             decoder_predict_probability = []
-            # encoder_weight_s = self.AttentionWeight_S_Layer(article_encoder_output)
+            encoder_weight_s = self.AttentionWeight_S_Layer(article_encoder_output)
             for word_index in range(abstract.size()[1]):
                 decoder_output, decoder_state = self.LSTM_Decoder_Layer(decoder_input, hx=decoder_state)
                 decoder_predict = self.Predict_Decoder_Layer(decoder_output)
@@ -332,14 +332,30 @@ class Seq2SeqWTopic(Seq2SeqWAttention):
                     [1, paragraph_weight_w.size()[1], 1])
                 paragraph_weight_add = paragraph_weight_w + paragraph_weight_s
                 paragraph_weight_final = self.TopicWeight_Final_Layer(paragraph_weight_add)
-                paragraph_weight_final = paragraph_weight_final.softmax(dim=1).repeat([1, 1, 1024])
+                paragraph_weight_final = paragraph_weight_final.softmax(dim=1).repeat([1, 1, 768])
 
                 topic_weighted_raw = paragraph_weight_final * paragraph_vector
                 topic_weighted = topic_weighted_raw.sum(dim=1).unsqueeze(1)
 
-                decoder_input = torch.cat([decoder_input, topic_weighted], dim=-1)
+                #####################################
+
+                decoder_weight_h = self.AttentionWeight_H_Layer(decoder_output).repeat([1, article.size()[1], 1])
+                decoder_weight_add = encoder_weight_s + decoder_weight_h
+                decoder_weight_add = decoder_weight_add.tanh()
+                decoder_weight = self.AttentionWeight_Final_Layer(decoder_weight_add).squeeze()
+                decoder_weight = torch.min(decoder_weight, article_mask).softmax(dim=-1)
+
+                decoder_weight_pad = decoder_weight.unsqueeze(-1).repeat([1, 1, self.lstm_size * 2])
+                decoder_attention_result = article_encoder_output * decoder_weight_pad
+                decoder_attention_result = torch.sum(decoder_attention_result, dim=1).unsqueeze(1)
+
+                #####################################
+
+                decoder_input = torch.cat([decoder_input, topic_weighted, decoder_attention_result], dim=-1)
                 # decoder_input = torch.cat([decoder_input, torch.zeros([decoder_input.size()[0], 1, 1024]).cuda()],
                 #                           dim=-1)
+                # print(numpy.shape(decoder_input))
+                # exit()
 
             decoder_predict_probability = torch.cat(decoder_predict_probability, dim=1)
 

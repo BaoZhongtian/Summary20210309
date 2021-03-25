@@ -12,7 +12,7 @@ if __name__ == '__main__':
 
     seq2seqBasic = Seq2SeqWAttention(cuda_flag=cuda_flag)
 
-    for parameter_index in range(3, 4):
+    for parameter_index in range(8):
         print('Treating', parameter_index)
         load_path = 'Result/Attention/Parameter-%04d.pkl' % parameter_index
         checkpoint = torch.load(load_path)

@@ -31,7 +31,7 @@ def Rouge_2(model, reference):  # terms_reference为参考摘要，terms_model�
 
 
 if __name__ == '__main__':
-    for file_index in range(3, 4):
+    for file_index in range(8):
         with open('Result/Attention/Predict-%04d.csv' % file_index, 'r') as file:
             predict_data = file.readlines()
         with open('Result/Attention/Label-%04d.csv' % file_index, 'r') as file:
