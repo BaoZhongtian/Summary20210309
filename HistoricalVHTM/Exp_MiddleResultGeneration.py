@@ -1,8 +1,7 @@
 import tqdm
 import torch
-import numpy
-from Model import Seq2SeqBasic, Seq2SeqWAttention
-from DataLoader import load_summarization
+from HistoricalVHTM.Model import Seq2SeqWAttention
+from HistoricalVHTM.DataLoader import load_summarization
 
 if __name__ == '__main__':
     cuda_flag = True
@@ -12,7 +11,7 @@ if __name__ == '__main__':
 
     seq2seqBasic = Seq2SeqWAttention(cuda_flag=cuda_flag)
 
-    for parameter_index in range(8):
+    for parameter_index in range(7, 8):
         print('Treating', parameter_index)
         load_path = 'Result/Attention/Parameter-%04d.pkl' % parameter_index
         checkpoint = torch.load(load_path)
@@ -21,16 +20,18 @@ if __name__ == '__main__':
         if cuda_flag: seq2seqBasic.cuda()
 
         seq2seqBasic.eval()
-        predict_file = open('Result/Attention/Predict-%04d.csv' % parameter_index, 'w')
-        label_file = open('Result/Attention/Label-%04d.csv' % parameter_index, 'w')
+        predict_file = open('Result/Attention/Predict-%04d-Another.csv' % parameter_index, 'w')
+        label_file = open('Result/Attention/Label-%04d-Another.csv' % parameter_index, 'w')
         for batchIndex, [batchArticle, batchArticleLength, batchAbstract, batchAbstractLength] in tqdm.tqdm(
                 enumerate(test_dataset)):
             # if batchIndex > 100: exit()
             decoder_predict_result = seq2seqBasic(
                 dictionary_embedding, batchArticle, batchArticleLength, batchAbstract, batchAbstractLength,
                 decode_flag=True)
+            # exit()
             decoder_predict_result = decoder_predict_result.cpu().detach().numpy()
             # print(numpy.shape(decoder_predict_result))
+            # exit()
             # exit()
             for indexX in range(len(batchAbstract)):
                 for indexY in range(batchAbstractLength[indexX]):

@@ -1,6 +1,6 @@
 import os
 import torch
-from Model import Seq2SeqBasic
+from HistoricalVHTM.Model import Seq2SeqBasic
 from Historical.DataLoader_Old import loader_summarization
 
 if __name__ == '__main__':

@@ -2,7 +2,7 @@ import os
 import tqdm
 import torch
 import numpy
-from Model import VariationalAutoEncoder
+from HistoricalVHTM.Model import VariationalAutoEncoder
 from Historical.DataLoader_Old import loader_summarization
 
 if __name__ == '__main__':

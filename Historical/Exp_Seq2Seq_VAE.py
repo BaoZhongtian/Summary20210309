@@ -1,7 +1,7 @@
 import os
 import torch
 import numpy
-from Model import Seq2SeqTopicBatch
+from HistoricalVHTM.Model import Seq2SeqTopicBatch
 from Historical.DataLoader_Old import loader_summarization
 
 if __name__ == '__main__':

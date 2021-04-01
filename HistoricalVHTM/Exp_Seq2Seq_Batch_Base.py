@@ -1,8 +1,7 @@
 import os
 import torch
-import numpy
-from Model import Seq2SeqBasic
-from DataLoader import load_summarization
+from HistoricalVHTM.Model import Seq2SeqBasic
+from HistoricalVHTM.DataLoader import load_summarization
 
 if __name__ == '__main__':
     cuda_flag = True

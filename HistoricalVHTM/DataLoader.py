@@ -74,7 +74,7 @@ class SummarizationTopicDataset(torch_utils_data.Dataset):
 
 
 def load_summarization(batch_size=8, max_length=600, paragraph_number=None):
-    load_path = 'Pretreatment'
+    load_path = '../Pretreatment'
     dictionary_embedding_raw = pickle.load(open(os.path.join(load_path, 'Dictionary_Embedding.pkl'), 'rb'))
     dictionary_embedding = []
     # print(dictionary_embedding_raw.keys())

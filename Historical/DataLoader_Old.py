@@ -6,7 +6,7 @@ import torch
 import torch.utils.data as torch_utils_data
 import pytorch_pretrained_bert
 
-import Model
+from HistoricalVHTM import Model
 
 
 class CollateSummarization:

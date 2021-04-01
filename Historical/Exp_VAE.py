@@ -1,6 +1,6 @@
 import os
 import torch
-from Model import VariationalAutoEncoder
+from HistoricalVHTM.Model import VariationalAutoEncoder
 from Historical.DataLoader_Old import loader_summarization
 
 if __name__ == '__main__':

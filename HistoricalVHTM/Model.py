@@ -247,6 +247,7 @@ class Seq2SeqWAttention(Seq2SeqBasic):
             return decoder_predict_result
 
 
+
 class Seq2SeqWTopic(Seq2SeqWAttention):
     def __init__(self, lstm_size=128, cuda_flag=True):
         super(Seq2SeqWTopic, self).__init__(lstm_size=lstm_size, cuda_flag=cuda_flag)
@@ -379,8 +380,7 @@ class VHTM(Seq2SeqWTopic):
 
 
 if __name__ == '__main__':
-    import os
-    from DataLoader import load_summarization
+    from HistoricalVHTM.DataLoader import load_summarization
 
     cuda_flag = True
 

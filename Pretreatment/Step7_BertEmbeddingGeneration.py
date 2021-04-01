@@ -2,7 +2,7 @@ import tqdm
 import torch
 import pickle
 import numpy
-from Model import BertModelRawForEmbedding
+from HistoricalVHTM.Model import BertModelRawForEmbedding
 
 if __name__ == '__main__':
     cuda_flag = True
