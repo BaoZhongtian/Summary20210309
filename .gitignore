@@ -4,3 +4,4 @@ Result\
 *.npy
 *.pkl
 *.pyc
+*.txt
